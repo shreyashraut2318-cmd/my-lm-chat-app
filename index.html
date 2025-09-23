@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <title>Local LM Chat</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #0f172a;
+      color: #f1f5f9;
+      margin: 0;
+      padding: 20px;
+    }
+
+    h1 {
+      text-align: center;
+    }
+
+    #chat {
+      max-width: 600px;
+      margin: 20px auto;
+      padding: 10px;
+      background: #1e293b;
+      border-radius: 8px;
+      height: 400px;
+      overflow-y: auto;
+    }
+
+    .msg {
+      margin: 10px 0;
+      padding: 8px 12px;
+      border-radius: 6px;
+      max-width: 80%;
+      white-space: pre-wrap;
+    }
+
+    .user {
+      background: #3b82f6;
+      margin-left: auto;
+    }
+
+    .ai {
+      background: #475569;
+      margin-right: auto;
+    }
+
+    #inputArea {
+      display: flex;
+      max-width: 600px;
+      margin: 20px auto;
+      gap: 10px;
+    }
+
+    #prompt {
+      flex: 1;
+      padding: 10px;
+      border-radius: 6px;
+      border: none;
+    }
+
+    #send {
+      padding: 10px 16px;
+      border: none;
+      border-radius: 6px;
+      background: #22c55e;
+      color: #fff;
+      cursor: pointer;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>💻 Local LM Chat</h1>
+
+  <div id="chat"></div>
+
+  <div id="inputArea">
+    <input id="prompt" type="text" placeholder="Type your message..." />
+    <button id="send">Send</button>
+  </div>
+
+  <script>
+    const chatBox = document.getElementById("chat");
+    const sendBtn = document.getElementById("send");
+    const promptInput = document.getElementById("prompt");
+
+    // 🌐 Your local LM Studio server endpoint
+    const ENDPOINT = "https://presentations-contest-minimum-revision.trycloudflare.com/v1/chat/completions"; // Update if your server port or path is different
+
+    // Store conversation for context
+    let conversation = [];
+
+    function addMessage(text, sender) {
+      const div = document.createElement("div");
+      div.className = "msg " + sender;
+      div.textContent = text;
+      chatBox.appendChild(div);
+      chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
+    async function sendMessage() {
+      const prompt = promptInput.value.trim();
+      if (!prompt) return;
+
+      addMessage(prompt, "user");
+      conversation.push({ role: "user", content: prompt });
+      promptInput.value = "";
+
+      try {
+        const res = await fetch(ENDPOINT, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            model: "dolphin-2.9.4-llama3.1-8b",  // Replace with your LM Studio model
+            messages: conversation,
+            max_tokens: 512
+          })
+        });
+
+        const data = await res.json();
+        // LM Studio usually returns output as data.choices[0].message.content
+        const reply = data?.choices?.[0]?.message?.content || "⚠️ No response";
+
+        addMessage(reply, "ai");
+        conversation.push({ role: "assistant", content: reply });
+
+      } catch (err) {
+        addMessage("⚠️ Error: " + err.message, "ai");
+      }
+    }
+
+    sendBtn.addEventListener("click", sendMessage);
+    promptInput.addEventListener("keydown", e => {
+      if (e.key === "Enter") sendMessage();
+    });
+  </script>
+</body>
+
+</html>
