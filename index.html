@@ -3,7 +3,7 @@
 
 <head>
   <meta charset="UTF-8" />
-  <title>Local LM Chat</title>
+  <title>Local LM Chat with Voice</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <style>
     body {
@@ -60,38 +60,78 @@
       border: none;
     }
 
-    #send {
+    #send,
+    #micBtn {
       padding: 10px 16px;
       border: none;
       border-radius: 6px;
-      background: #22c55e;
-      color: #fff;
       cursor: pointer;
+      color: #fff;
+    }
+
+    #send {
+      background: #22c55e;
+    }
+
+    #micBtn {
+      background: #ef4444;
+    }
+
+    #voiceControls {
+      max-width: 600px;
+      margin: 10px auto;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    select,
+    button {
+      padding: 6px;
+      border-radius: 6px;
+      border: none;
+    }
+
+    label {
+      display: flex;
+      align-items: center;
+      gap: 4px;
     }
   </style>
 </head>
 
 <body>
-  <h1>💻 Local LM Chat</h1>
+  <h1>💻 Local LM Chat with Voice</h1>
 
   <div id="chat"></div>
 
   <div id="inputArea">
     <input id="prompt" type="text" placeholder="Type your message..." />
     <button id="send">Send</button>
+    <button id="micBtn">🎤</button>
+  </div>
+
+  <div id="voiceControls">
+    <select id="voiceSelect"></select>
+    <label><input type="checkbox" id="readCheck"> Read Replies</label>
+    <button id="readBtn">🔊 Read</button>
   </div>
 
   <script>
     const chatBox = document.getElementById("chat");
     const sendBtn = document.getElementById("send");
+    const micBtn = document.getElementById("micBtn");
     const promptInput = document.getElementById("prompt");
+    const voiceSelect = document.getElementById("voiceSelect");
+    const readCheck = document.getElementById("readCheck");
+    const readBtn = document.getElementById("readBtn");
 
-    // 🌐 Your local LM Studio server endpoint
-    const ENDPOINT = "https://discuss-tar-rough-contributors.trycloudflare.com/v1/chat/completions"; // Update if your server port or path is different
+    const ENDPOINT = "https://lanes-split-sheffield-encountered.trycloudflare.com/v1/chat/completions";
 
-    // Store conversation for context
     let conversation = [];
+    let voices = [];
 
+    // 📝 Add message to chat
     function addMessage(text, sender) {
       const div = document.createElement("div");
       div.className = "msg " + sender;
@@ -100,6 +140,15 @@
       chatBox.scrollTop = chatBox.scrollHeight;
     }
 
+    // 📢 Speak text
+    function speak(text) {
+      const utterance = new SpeechSynthesisUtterance(text);
+      const selectedVoice = voices.find(v => v.name === voiceSelect.value);
+      if (selectedVoice) utterance.voice = selectedVoice;
+      speechSynthesis.speak(utterance);
+    }
+
+    // 🚀 Send message to LM
     async function sendMessage() {
       const prompt = promptInput.value.trim();
       if (!prompt) return;
@@ -111,37 +160,80 @@
       try {
         const res = await fetch(ENDPOINT, {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            model: "deepseek-r1-distill-qwen-7b",  // Replace with your LM Studio model
+            model: "dolphin-2.9.4-llama3.1-8b",
             messages: conversation,
             max_tokens: 512
           })
         });
 
         const data = await res.json();
-        // LM Studio usually returns output as data.choices[0].message.content
         const reply = data?.choices?.[0]?.message?.content || "⚠️ No response";
 
         addMessage(reply, "ai");
         conversation.push({ role: "assistant", content: reply });
+
+        if (readCheck.checked) {
+          speak(reply);
+        }
 
       } catch (err) {
         addMessage("⚠️ Error: " + err.message, "ai");
       }
     }
 
+    // 🎤 Voice input
+    function startListening() {
+      if (!('webkitSpeechRecognition' in window)) {
+        alert("Speech recognition not supported in this browser.");
+        return;
+      }
+
+      const recognition = new webkitSpeechRecognition();
+      recognition.lang = "en-US";
+      recognition.interimResults = false;
+      recognition.maxAlternatives = 1;
+
+      recognition.onresult = (event) => {
+        const transcript = event.results[0][0].transcript;
+        promptInput.value = transcript;
+        sendMessage();
+      };
+
+      recognition.onerror = (event) => {
+        console.error("Speech recognition error:", event.error);
+      };
+
+      recognition.start();
+    }
+
+    // 🗣️ Populate voice list
+    function loadVoices() {
+      voices = speechSynthesis.getVoices();
+      voiceSelect.innerHTML = "";
+      voices.forEach(v => {
+        const option = document.createElement("option");
+        option.value = v.name;
+        option.textContent = v.name + (v.default ? " (default)" : "");
+        voiceSelect.appendChild(option);
+      });
+    }
+
     sendBtn.addEventListener("click", sendMessage);
     promptInput.addEventListener("keydown", e => {
       if (e.key === "Enter") sendMessage();
     });
+
+    micBtn.addEventListener("click", startListening);
+    readBtn.addEventListener("click", () => {
+      const lastReply = conversation.filter(m => m.role === "assistant").pop();
+      if (lastReply) speak(lastReply.content);
+    });
+
+    window.speechSynthesis.onvoiceschanged = loadVoices;
+    loadVoices();
   </script>
 </body>
 
 </html>
-
-
-
-
